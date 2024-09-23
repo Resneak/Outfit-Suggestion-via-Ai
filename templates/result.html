@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Color Extraction Result</title>
+</head>
+<body>
+    <h1>Extracted Colors</h1>
+    <img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Uploaded Image" width="300">
+    <div>
+        {% for color in colors %}
+            <div style="display: inline-block; width: 100px; height: 100px; background-color: {{ color }};"></div>
+            <p>{{ color }}</p>
+        {% endfor %}
+    </div>
+    <a href="{{ url_for('home') }}">Upload Another Image</a>
+</body>
+</html>
