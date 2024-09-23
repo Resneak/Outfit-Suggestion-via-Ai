@@ -2,17 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Color Extraction Result</title>
+    <style>
+        /* Add some basic styling */
+        .color-box {
+            display: inline-block;
+            width: 100px;
+            height: 100px;
+            margin-right: 10px;
+        }
+        .color-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .color-label {
+            margin-left: 10px;
+        }
+    </style>
 </head>
 <body>
     <h1>Extracted Colors</h1>
-    <img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Uploaded Image" width="300">
+    <!-- Display the uploaded image -->
+    <img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Uploaded clothing item" width="300">
+
+    <!-- Display the extracted colors -->
     <div>
         {% for color in colors %}
-            <div style="display: inline-block; width: 100px; height: 100px; background-color: {{ color }};"></div>
-            <p>{{ color }}</p>
+        <div class="color-container">
+            <div class="color-box" style="background-color: {{ color }};"></div>
+            <p class="color-label">{{ color }}</p>
+        </div>
         {% endfor %}
     </div>
+
     <a href="{{ url_for('home') }}">Upload Another Image</a>
 </body>
 </html>
