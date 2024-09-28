@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Outfit Suggestions</title>
+    <style>
+        .outfit-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .outfit {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px;
+            width: 300px; /* Adjust as needed */
+            box-sizing: border-box;
+        }
+        .item {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .item img {
+            width: 100px;
+            height: auto;
+        }
+        .item-title {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Outfit Suggestions</h1>
+    {% if suggestions %}
+        <div class="outfit-container">
+            {% for suggestion in suggestions %}
+                <div class="outfit">
+                    <h2>Score: {{ suggestion.score|round(2) }}</h2>
+                    <div class="item">
+                        <p class="item-title">Top</p>
+                        <img src="{{ url_for('static', filename='uploads/' + suggestion.top.image_filename) }}" alt="Top">
+                        <p>Category: {{ suggestion.top.category }}</p>
+                    </div>
+                    <div class="item">
+                        <p class="item-title">Bottom</p>
+                        <img src="{{ url_for('static', filename='uploads/' + suggestion.bottom.image_filename) }}" alt="Bottom">
+                        <p>Category: {{ suggestion.bottom.category }}</p>
+                    </div>
+                    <div class="item">
+                        <p class="item-title">Footwear</p>
+                        <img src="{{ url_for('static', filename='uploads/' + suggestion.footwear.image_filename) }}" alt="Footwear">
+                        <p>Category: {{ suggestion.footwear.category }}</p>
+                    </div>
+                    {% if suggestion.outerwear %}
+                    <div class="item">
+                        <p class="item-title">Outerwear</p>
+                        <img src="{{ url_for('static', filename='uploads/' + suggestion.outerwear.image_filename) }}" alt="Outerwear">
+                        <p>Category: {{ suggestion.outerwear.category }}</p>
+                    </div>
+                    {% endif %}
+                    {% if suggestion.accessory %}
+                    <div class="item">
+                        <p class="item-title">Accessory</p>
+                        <img src="{{ url_for('static', filename='uploads/' + suggestion.accessory.image_filename) }}" alt="Accessory">
+                        <p>Category: {{ suggestion.accessory.category }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No outfit suggestions available. Please add more items to your wardrobe.</p>
+    {% endif %}
+    <a href="{{ url_for('home') }}">Upload More Items</a><br>
+    <a href="{{ url_for('wardrobe') }}">View My Wardrobe</a>
+</body>
+</html>

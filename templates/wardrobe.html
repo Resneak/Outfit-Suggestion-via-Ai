@@ -36,12 +36,13 @@
         {% for item in items %}
             <div class="item">
                 <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Clothing Item">
+                <p>Category: {{ item.category }}</p>
                 <div>
-                    {% for color_pair in item.colors.split(';') %}
-                        {% set hex_color, color_name = color_pair.split(',') %}
+                    <!-- Split the colors field by comma and display each color -->
+                    {% for hex_color in item.colors.split(',') %}
                         <div class="color-container">
                             <div class="color-box" style="background-color: {{ hex_color }};"></div>
-                            <p class="color-label">{{ color_name }} ({{ hex_color }})</p>
+                            <p class="color-label">{{ hex_color }}</p> <!-- Display the hex color -->
                         </div>
                     {% endfor %}
                 </div>
@@ -51,5 +52,7 @@
         {% endfor %}
     </div>
     <a href="{{ url_for('home') }}">Upload More Items</a>
+    <a href="{{ url_for('suggestions') }}">Get Outfit Suggestions</a>
+
 </body>
 </html>
