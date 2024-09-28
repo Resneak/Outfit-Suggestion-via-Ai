@@ -20,6 +20,14 @@
             margin-right: 5px;
             border: 1px solid #000;
         }
+        .color-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .color-label {
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -29,8 +37,12 @@
             <div class="item">
                 <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Clothing Item">
                 <div>
-                    {% for color in item.colors.split(',') %}
-                        <div class="color-box" style="background-color: {{ color }};"></div>
+                    {% for color_pair in item.colors.split(';') %}
+                        {% set hex_color, color_name = color_pair.split(',') %}
+                        <div class="color-container">
+                            <div class="color-box" style="background-color: {{ hex_color }};"></div>
+                            <p class="color-label">{{ color_name }} ({{ hex_color }})</p>
+                        </div>
                     {% endfor %}
                 </div>
             </div>

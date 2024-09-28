@@ -29,13 +29,14 @@
 
     <!-- Display the extracted colors -->
     <div>
-        {% for color in colors %}
+        {% for hex_color, color_name in colors %}
         <div class="color-container">
-            <div class="color-box" style="background-color: {{ color }};"></div>
-            <p class="color-label">{{ color }}</p>
+            <div class="color-box" style="background-color: {{ hex_color }};"></div>
+            <p class="color-label">{{ color_name }} ({{ hex_color }})</p>
         </div>
         {% endfor %}
     </div>
+    
 
     <a href="{{ url_for('home') }}">Upload Another Image</a>
     <a href="{{ url_for('wardrobe') }}">View My Wardrobe</a>

@@ -1,12 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for
 import os
-from PIL import Image
 import cv2
 import numpy as np
 from sklearn.cluster import KMeans
 from collections import Counter
-from flask_sqlalchemy import SQLAlchemy  # Import SQLAlchemy
-
+from flask_sqlalchemy import SQLAlchemy
+import webcolors
 
 app = Flask(__name__)
 
@@ -26,14 +25,13 @@ if not os.path.exists(UPLOAD_FOLDER):
 class ClothingItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     image_filename = db.Column(db.String(100), nullable=False)
-    colors = db.Column(db.String(200), nullable=False)
+    colors = db.Column(db.String(500), nullable=False)  # Increased size to accommodate names
 
     def __repr__(self):
         return f'<ClothingItem {self.id}>'
 
 with app.app_context():
     db.create_all()
-
 
 @app.route('/')
 def home():
@@ -54,10 +52,11 @@ def upload():
         file.save(filepath)
 
         # Process the image
-        colors = extract_colors(filepath)  # This returns a list of hex color codes
+        colors = extract_colors(filepath)  # Now returns a list of (hex_color, color_name)
 
         # Save to database
-        colors_str = ','.join(colors)  # Convert list of colors to a comma-separated string
+        # Convert list of tuples to a string for storage, e.g., "hex1,name1;hex2,name2;hex3,name3"
+        colors_str = ';'.join([f"{hex_color},{color_name}" for hex_color, color_name in colors])
         new_item = ClothingItem(image_filename=filename, colors=colors_str)
         db.session.add(new_item)
         db.session.commit()
@@ -70,7 +69,25 @@ def wardrobe():
     items = ClothingItem.query.all()
     return render_template('wardrobe.html', items=items)
 
+def closest_colour(requested_colour):
+    min_colours = {}
+    for hex_code, name in webcolors.CSS3_HEX_TO_NAMES.items():
+        r_c, g_c, b_c = webcolors.hex_to_rgb(hex_code)
+        rd = (r_c - requested_colour.red) ** 2
+        gd = (g_c - requested_colour.green) ** 2
+        bd = (b_c - requested_colour.blue) ** 2
+        min_colours[(rd + gd + bd)] = name
+    closest_name = min_colours[min(min_colours.keys())]
+    return closest_name
 
+def get_color_name(hex_color):
+    try:
+        color_name = webcolors.hex_to_name(hex_color, spec='css3')
+    except ValueError:
+        # If the exact color name is not found, find the closest match
+        rgb_color = webcolors.hex_to_rgb(hex_color)
+        color_name = closest_colour(rgb_color)
+    return color_name
 
 def extract_colors(image_path, num_colors=3):
     # Load image using OpenCV
@@ -89,8 +106,12 @@ def extract_colors(image_path, num_colors=3):
     center_colors = kmeans.cluster_centers_
     # Sort colors by frequency
     ordered_colors = [center_colors[i] for i in counts.keys()]
+    # Convert RGB to Hex
     hex_colors = [rgb_to_hex(ordered_colors[i]) for i in range(len(ordered_colors))]
-    return hex_colors
+    # Get color names
+    color_names = [get_color_name(hex_colors[i]) for i in range(len(hex_colors))]
+    # Return list of tuples (hex_color, color_name)
+    return list(zip(hex_colors, color_names))
 
 def rgb_to_hex(color):
     return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
