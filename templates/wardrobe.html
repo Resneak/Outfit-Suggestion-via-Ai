@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Wardrobe</title>
+    <style>
+        .item {
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+        }
+        .item img {
+            width: 150px;
+            height: auto;
+        }
+        .color-box {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>My Wardrobe</h1>
+    <div>
+        {% for item in items %}
+            <div class="item">
+                <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Clothing Item">
+                <div>
+                    {% for color in item.colors.split(',') %}
+                        <div class="color-box" style="background-color: {{ color }};"></div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% else %}
+            <p>No items in your wardrobe yet.</p>
+        {% endfor %}
+    </div>
+    <a href="{{ url_for('home') }}">Upload More Items</a>
+</body>
+</html>

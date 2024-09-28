@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 from sklearn.cluster import KMeans
 from collections import Counter
+from flask_sqlalchemy import SQLAlchemy  # Import SQLAlchemy
+
 
 app = Flask(__name__)
 
@@ -12,9 +14,26 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Configure the SQLite database
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Silence the deprecation warning
+db = SQLAlchemy(app)  # Initialize the database
+
 # Ensure the upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+class ClothingItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    image_filename = db.Column(db.String(100), nullable=False)
+    colors = db.Column(db.String(200), nullable=False)
+
+    def __repr__(self):
+        return f'<ClothingItem {self.id}>'
+
+with app.app_context():
+    db.create_all()
+
 
 @app.route('/')
 def home():
@@ -35,9 +54,23 @@ def upload():
         file.save(filepath)
 
         # Process the image
-        colors = extract_colors(filepath)
+        colors = extract_colors(filepath)  # This returns a list of hex color codes
+
+        # Save to database
+        colors_str = ','.join(colors)  # Convert list of colors to a comma-separated string
+        new_item = ClothingItem(image_filename=filename, colors=colors_str)
+        db.session.add(new_item)
+        db.session.commit()
+
         # Render results
         return render_template('result.html', colors=colors, filename=filename)
+
+@app.route('/wardrobe')
+def wardrobe():
+    items = ClothingItem.query.all()
+    return render_template('wardrobe.html', items=items)
+
+
 
 def extract_colors(image_path, num_colors=3):
     # Load image using OpenCV
