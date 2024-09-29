@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import os
 import cv2
 import numpy as np
@@ -9,6 +9,7 @@ import webcolors
 from colormath.color_objects import sRGBColor, LabColor
 from colormath.color_conversions import convert_color
 from colormath.color_diff import delta_e_cie2000
+import requests
 
 app = Flask(__name__)
 
@@ -24,6 +25,10 @@ db = SQLAlchemy(app)  # Initialize the database
 # Ensure the upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY')
+if not OPENWEATHER_API_KEY:
+    raise RuntimeError("OpenWeather API key not found. Please set the OPENWEATHER_API_KEY environment variable.")
 
 class ClothingItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -81,10 +86,60 @@ def wardrobe():
     items = ClothingItem.query.all()
     return render_template('wardrobe.html', items=items)
 
-@app.route('/suggestions')
+@app.route('/suggestions', methods=['GET'])
 def suggestions():
-    suggestions = suggest_outfits()
-    return render_template('suggestions.html', suggestions=suggestions)
+    # Get selected categories from the query parameters
+    selected_categories = request.args.getlist('categories')
+
+    # If no categories are selected, default to mandatory categories
+    if not selected_categories:
+        selected_categories = ['Top', 'Bottom', 'Footwear']  # Default categories
+
+    # Call the suggestion function with selected categories
+    suggestions = suggest_outfits(selected_categories)
+
+    return render_template('suggestions.html', suggestions=suggestions, selected_categories=selected_categories)
+
+@app.route('/get_weather', methods=['POST'])
+def get_weather():
+    data = request.get_json()
+    lat = data.get('lat')
+    lon = data.get('lon')
+
+    if not lat or not lon:
+        return jsonify({'error': 'Missing latitude or longitude'}), 400
+
+    # Build the API URL
+    url = 'https://api.openweathermap.org/data/2.5/weather'
+    params = {
+        'lat': lat,
+        'lon': lon,
+        'appid': OPENWEATHER_API_KEY,
+        'units': 'imperial'  # Use 'imperial' for Fahrenheit
+    }
+
+    # Make the API request
+    response = requests.get(url, params=params)
+
+    if response.status_code == 200:
+        weather_data = response.json()
+        # Extract weather information
+        description = weather_data['weather'][0]['description'].capitalize()
+        temp = round(weather_data['main']['temp'])
+        icon_code = weather_data['weather'][0]['icon']
+        # Build the icon URL
+        icon_url = f"http://openweathermap.org/img/wn/{icon_code}@2x.png"
+        # Prepare data to send to the client
+        weather_info = {
+            'description': description,
+            'temp': temp,
+            'icon_url': icon_url
+        }
+        return jsonify(weather_info)
+    else:
+        print(f"OpenWeather API Error: {response.status_code} - {response.text}")
+        return jsonify({'error': 'Failed to retrieve weather data'}), response.status_code
+
 
 
 # -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ FUNCTIONS
@@ -100,7 +155,7 @@ def calculate_color_difference(color1, color2):
     delta_e = delta_e_cie2000(lab1, lab2)
     return delta_e
 
-def suggest_outfits():
+def suggest_outfits(selected_categories):
     # Get all items from the database
     items = ClothingItem.query.all()
 
@@ -118,62 +173,52 @@ def suggest_outfits():
 
     suggestions = []
 
-    # Ensure we have at least one item in each mandatory category
-    if not categories['Top'] or not categories['Bottom'] or not categories['Footwear']:
-        return suggestions  # Return empty list if any mandatory category is empty
+    # Ensure that for selected categories, there are items available
+    for cat in selected_categories:
+        if not categories[cat]:
+            # No items in this category; cannot generate outfits
+            return suggestions
 
-    # Build outfits with all combinations of Top, Bottom, and Footwear
-    for top in categories['Top']:
-        top_colors = [pair.split(',')[0] for pair in top.colors.split(';') if pair]
-        if not top_colors:
-            continue
-        top_main_color = top_colors[0]
+    from itertools import product
 
-        for bottom in categories['Bottom']:
-            bottom_colors = [pair.split(',')[0] for pair in bottom.colors.split(';') if pair]
-            if not bottom_colors:
-                continue
-            bottom_main_color = bottom_colors[0]
+    # Prepare a list of item lists for selected categories
+    selected_items = [categories[cat] for cat in selected_categories]
 
-            # Calculate color difference between top and bottom
-            color_diff_tb = calculate_color_difference(top_main_color, bottom_main_color)
+    # Generate all combinations of selected items
+    for combination in product(*selected_items):
+        outfit = {}
+        hex_colors = []
+        for item in combination:
+            category = item.category.lower()
+            outfit[category] = item
+            # Get the main color
+            item_colors = [pair.split(',')[0] for pair in item.colors.split(';') if pair]
+            if item_colors:
+                hex_colors.append(item_colors[0])
 
-            for footwear in categories['Footwear']:
-                footwear_colors = [pair.split(',')[0] for pair in footwear.colors.split(';') if pair]
-                if not footwear_colors:
-                    continue
-                footwear_main_color = footwear_colors[0]
+        # Calculate average color difference between all pairs
+        from itertools import combinations
+        pair_diffs = []
+        for color1, color2 in combinations(hex_colors, 2):
+            diff = calculate_color_difference(color1, color2)
+            pair_diffs.append(diff)
 
-                # Calculate color difference between bottom and footwear
-                color_diff_bf = calculate_color_difference(bottom_main_color, footwear_main_color)
+        if pair_diffs:
+            avg_color_diff = sum(pair_diffs) / len(pair_diffs)
+        else:
+            avg_color_diff = 0
 
-                # Average color difference
-                avg_color_diff = (color_diff_tb + color_diff_bf) / 2
-
-                # If average color difference is within a desirable range, consider it a good match
-                # Adjust the thresholds as needed
-                if 20 < avg_color_diff < 80:
-                    outfit = {
-                        'top': top,
-                        'bottom': bottom,
-                        'footwear': footwear,
-                        'score': avg_color_diff
-                    }
-
-                    # Optionally add outerwear
-                    if categories['Outerwear']:
-                        outfit['outerwear'] = categories['Outerwear'][0]  # You can implement selection logic here
-
-                    # Optionally add accessory
-                    if categories['Accessory']:
-                        outfit['accessory'] = categories['Accessory'][0]  # You can implement selection logic here
-
-                    suggestions.append(outfit)
+        # Decide whether to include the outfit based on color difference
+        # Adjust thresholds as needed
+        if 20 < avg_color_diff < 40:
+            outfit['score'] = avg_color_diff
+            suggestions.append(outfit)
 
     # Sort suggestions by score
     suggestions.sort(key=lambda x: x['score'])
 
     return suggestions
+
 
 
 

@@ -1,47 +1,44 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Color Extraction Result</title>
-    <style>
-        /* Add some basic styling */
-        .color-box {
-            display: inline-block;
-            width: 100px;
-            height: 100px;
-            margin-right: 10px;
-        }
-        .color-container {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .color-label {
-            margin-left: 10px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Extracted Colors</h1>
-    <!-- Display the uploaded image -->
-    <img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Uploaded clothing item" width="300">
+{% extends "base.html" %}
 
-    <!-- Display the extracted colors -->
-    <div>
-        {% for hex_color, color_name in colors %}
-        <div class="color-container">
-            <div class="color-box" style="background-color: {{ hex_color }};"></div>
-            <p class="color-label">{{ color_name }} ({{ hex_color }})</p>
-        </div>
-        {% endfor %}
+{% block title %}Color Extraction Result{% endblock %}
+
+{% block content %}
+<h1>Extracted Colors</h1>
+<!-- Display the uploaded image -->
+<img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Uploaded clothing item" width="300">
+
+<!-- Display the extracted colors -->
+<div>
+    {% for hex_color, color_name in colors %}
+    <div class="color-container">
+        <div class="color-box" style="background-color: {{ hex_color }};"></div>
+        <p class="color-label">{{ color_name }} ({{ hex_color }})</p>
     </div>
-    
+    {% endfor %}
+</div>
 
-    <a href="{{ url_for('home') }}">Upload Another Image</a>
-    <a href="{{ url_for('wardrobe') }}">View My Wardrobe</a>
-    <a href="{{ url_for('suggestions') }}">Get Outfit Suggestions</a>
+<a href="{{ url_for('home') }}">Upload Another Image</a><br>
+<a href="{{ url_for('wardrobe') }}">View My Wardrobe</a><br>
+<a href="{{ url_for('suggestions') }}">Get Outfit Suggestions</a>
+{% endblock %}
 
-
-</body>
-</html>
+{% block head %}
+{{ super() }}
+<style>
+    /* Add some basic styling */
+    .color-box {
+        display: inline-block;
+        width: 100px;
+        height: 100px;
+        margin-right: 10px;
+    }
+    .color-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .color-label {
+        margin-left: 10px;
+    }
+</style>
+{% endblock %}

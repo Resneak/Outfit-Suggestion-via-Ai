@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+    {% block head %}
+    <meta charset="UTF-8">
+    <title>{% block title %}AI Outfit Project{% endblock %}</title>
+    {% endblock %}
+    <style>
+        /* Include any global styles here */
+        #weather-info {
+            background-color: #e0f7fa;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #weather-icon {
+            width: 50px;
+            height: 50px;
+        }
+        #weather-text {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+    </style>
+    
+    
+</head>
+<body>
+    <!-- Weather display at the top -->
+    <div id="weather-info" style="text-align: center; margin-bottom: 20px;">
+        <img id="weather-icon" src="" alt="Weather Icon" style="vertical-align: middle;">
+        <span id="weather-text" style="font-size: 1.2em; margin-left: 10px;"></span>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <!-- Include JavaScript -->
+    <script>
+        // Check if the browser supports geolocation
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(sendPositionToServer, showError);
+        } else {
+            console.log("Geolocation is not supported by this browser.");
+        }
+
+        function sendPositionToServer(position) {
+            var lat = position.coords.latitude;
+            var lon = position.coords.longitude;
+
+            // Send the location to the server via a POST request
+            fetch('{{ url_for("get_weather") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ lat: lat, lon: lon })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // If the response is not OK, throw an error
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    console.error('Server error:', data.error);
+                    document.getElementById('weather-text').textContent = "Error retrieving weather data.";
+                } else {
+                    // Display the weather information
+                    document.getElementById('weather-icon').src = data.icon_url;
+                    document.getElementById('weather-text').textContent = `${data.description}, ${data.temp}°F`;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching weather data:', error);
+                document.getElementById('weather-text').textContent = "Error fetching weather data.";
+            });
+        }
+
+        function showError(error) {
+            console.log("Error getting location:", error.message);
+            document.getElementById('weather-text').textContent = "Unable to retrieve weather data without location access.";
+        }
+    </script>
+</body>
+
+</html>

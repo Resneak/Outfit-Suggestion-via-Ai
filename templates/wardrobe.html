@@ -1,58 +1,61 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>My Wardrobe</title>
-    <style>
-        .item {
-            display: inline-block;
-            margin: 10px;
-            text-align: center;
-        }
-        .item img {
-            width: 150px;
-            height: auto;
-        }
-        .color-box {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            margin-right: 5px;
-            border: 1px solid #000;
-        }
-        .color-container {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-        }
-        .color-label {
-            margin-left: 5px;
-        }
-    </style>
-</head>
-<body>
-    <h1>My Wardrobe</h1>
-    <div>
-        {% for item in items %}
-            <div class="item">
-                <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Clothing Item">
-                <p>Category: {{ item.category }}</p>
-                <div>
-                    <!-- Split the colors field by comma and display each color -->
-                    {% for hex_color in item.colors.split(',') %}
+{% extends "base.html" %}
+
+{% block title %}My Wardrobe{% endblock %}
+
+{% block content %}
+<h1>My Wardrobe</h1>
+<div>
+    {% for item in items %}
+        <div class="item">
+            <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Clothing Item">
+            <p>Category: {{ item.category }}</p>
+            <div>
+                <!-- Split the colors field by semicolon and display each color -->
+                {% for color_pair in item.colors.split(';') %}
+                    {% if color_pair %}
+                        {% set hex_color = color_pair.split(',')[0] %}
                         <div class="color-container">
                             <div class="color-box" style="background-color: {{ hex_color }};"></div>
-                            <p class="color-label">{{ hex_color }}</p> <!-- Display the hex color -->
+                            <p class="color-label">{{ hex_color }}</p>
                         </div>
-                    {% endfor %}
-                </div>
+                    {% endif %}
+                {% endfor %}
             </div>
-        {% else %}
-            <p>No items in your wardrobe yet.</p>
-        {% endfor %}
-    </div>
-    <a href="{{ url_for('home') }}">Upload More Items</a>
-    <a href="{{ url_for('suggestions') }}">Get Outfit Suggestions</a>
+        </div>
+    {% else %}
+        <p>No items in your wardrobe yet.</p>
+    {% endfor %}
+</div>
+<a href="{{ url_for('home') }}">Upload More Items</a><br>
+<a href="{{ url_for('suggestions') }}">Get Outfit Suggestions</a>
+{% endblock %}
 
-</body>
-</html>
+{% block head %}
+{{ super() }}
+<style>
+    .item {
+        display: inline-block;
+        margin: 10px;
+        text-align: center;
+    }
+    .item img {
+        width: 150px;
+        height: auto;
+    }
+    .color-box {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        margin-right: 5px;
+        border: 1px solid #000;
+    }
+    .color-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+    .color-label {
+        margin-left: 5px;
+    }
+</style>
+{% endblock %}
