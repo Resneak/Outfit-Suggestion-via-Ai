@@ -1,0 +1,6 @@
+torch
+torchvision
+pillow==9.0.1
+paddlepaddle
+paddlehub
+gradio

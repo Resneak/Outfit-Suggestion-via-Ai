@@ -16,6 +16,13 @@ import requests
 from fastai.vision.all import load_learner, PILImage
 from functools import partial
 import torch
+import torch.nn as nn
+from torchvision import transforms
+from PIL import Image
+
+from u2net import U2NET  # Assuming the u2net.py file is in the same directory
+import torchvision.transforms as transforms
+
 
 app = Flask(__name__)
 
@@ -43,7 +50,7 @@ def top_k_accuracy(inp, targ, k=3):
     targ = targ.unsqueeze(dim=-1)
     return (inp == targ).any(dim=-1).float().mean()
 
-# Load the trained model when the app starts
+# Load the trained clothing classification model
 MODEL_PATH = './models/deepfashion_resnet34.pkl'
 learn = load_learner(MODEL_PATH)
 
@@ -52,6 +59,12 @@ if learn and hasattr(learn.dls, 'vocab'):
     DETAILED_CATEGORIES = learn.dls.vocab
 else:
     DETAILED_CATEGORIES = []  # Fallback if model loading fails
+
+# Load U-2-Net model for background removal
+U2NET_PATH = 'u2net.pth'  # Ensure the u2net.pth file is in the same directory
+u2net = U2NET(3, 1)
+u2net.load_state_dict(torch.load(U2NET_PATH, map_location=torch.device('cpu')))
+u2net.eval()  # Set model to evaluation mode
 
 # Define the mapping from detailed categories to broader categories
 CATEGORY_MAPPING = {
@@ -65,8 +78,7 @@ CATEGORY_MAPPING = {
     'Flannel': 'Top',
     'Halter': 'Top',
     'Henley': 'Top',
-    'Hoodie': 'Top',
-    'Jacket': 'Top',
+    
     'Jersey': 'Top',
     'Sweater': 'Top',
     'Tank': 'Top',
@@ -93,12 +105,14 @@ CATEGORY_MAPPING = {
     'Trunks': 'Bottom',
 
     # Outerwear categories
+    'Hoodie': 'Outerwear',
     'Parka': 'Outerwear',
     'Peacoat': 'Outerwear',
     'Poncho': 'Outerwear',
     'Caftan': 'Outerwear',
     'Cape': 'Outerwear',
     'Coat': 'Outerwear',
+    'Jacket': 'Outerwear',
 
     # Dress/Full Body categories
     'Coverup': 'Dress',
@@ -113,7 +127,6 @@ CATEGORY_MAPPING = {
     'Shirtdress': 'Dress',
     'Sundress': 'Dress'
 }
-
 
 # Define the list of broader categories
 CATEGORY_LIST = ['Top', 'Bottom', 'Outerwear', 'Footwear', 'Accessory', 'Dress']
@@ -138,7 +151,6 @@ def home():
     items = ClothingItem.query.all()
     return render_template('index.html', items=items)
 
-
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST':
@@ -155,32 +167,39 @@ def upload():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
 
+            # Remove background and save the processed image
+            processed_image = remove_background(filepath)
+            processed_filename = f"processed_{os.path.splitext(filename)[0]}.png"
+            processed_filepath = os.path.join(app.config['UPLOAD_FOLDER'], processed_filename)
+            processed_image.save(processed_filepath, format='PNG')
+
             # Process the image for color extraction
-            colors = extract_colors(filepath)
+            colors = extract_colors(processed_filepath)
 
             # Predict category using the model
             if learn:
                 try:
                     pred_class, pred_idx, probs = learn.predict(filepath)
-                    confidence = round(probs[pred_idx].item() * 100)  # Convert to percentage and round to nearest whole number
+                    confidence = round(probs[pred_idx].item() * 100)
                     detailed_category = pred_class
                     broader_category = CATEGORY_MAPPING.get(detailed_category, 'Accessory')
                     print(f"Predicted Category: {detailed_category} -> {broader_category}, Confidence: {confidence:.2f}%")
                 except Exception as e:
                     print(f"Error during prediction: {e}")
                     detailed_category = "Unknown"
-                    broader_category = "Accessory"  # Default to 'Accessory' if prediction fails
+                    broader_category = "Accessory"
                     confidence = 0
             else:
                 detailed_category = "Unknown"
                 broader_category = "Accessory"
                 confidence = 0
 
-            # Render a template to display the image, extracted colors, and predicted category
+            # Render a template to display the images, extracted colors, and predicted category
             return render_template(
                 'confirm.html',
                 colors=colors,
                 filename=filename,
+                processed_filename=processed_filename,
                 predicted_category=detailed_category,
                 broader_category=broader_category,
                 categories=CATEGORY_LIST,
@@ -189,7 +208,6 @@ def upload():
     else:
         # If GET request, render the upload page
         return render_template('upload.html')
-
 
 @app.route('/confirm', methods=['POST'])
 def confirm():
@@ -367,28 +385,44 @@ def suggest_outfits(selected_categories):
 
     return suggestions
 
+u2net_transform = transforms.Compose([
+    transforms.Resize((320, 320)),  # Resize to the size expected by U-2-Net
+    transforms.ToTensor(),  # Convert to Tensor
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # Normalize using ImageNet stats
+])
+
 def remove_background(image_path):
-    img = cv2.imread(image_path)
-    mask = np.zeros(img.shape[:2], np.uint8)
+    # Load the image
+    image = Image.open(image_path).convert('RGB')
+    original_size = image.size
 
-    # Create temporary arrays used by GrabCut algorithm
-    bgdModel = np.zeros((1, 65), np.float64)
-    fgdModel = np.zeros((1, 65), np.float64)
+    # Preprocess the image
+    image_transformed = u2net_transform(image).unsqueeze(0)  # Add batch dimension
 
-    # Define the rectangle that contains the object to segment
-    height, width = img.shape[:2]
-    rect = (10, 10, width - 20, height - 20)
+    # Run the image through the U-2-Net model
+    with torch.no_grad():
+        prediction = u2net(image_transformed)[0][:, 0, :, :].cpu().numpy()
+    
+    # Post-process the predicted mask
+    mask = (prediction > 0.5).astype(np.uint8)  # Binarize the mask, threshold at 0.5
 
-    # Apply GrabCut algorithm
-    cv2.grabCut(img, mask, rect, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_RECT)
+    # Resize mask to match the input image size
+    mask = cv2.resize(mask[0], original_size, interpolation=cv2.INTER_NEAREST)
 
-    # Create a mask where sure background and possible background pixels are set to 0, and the rest to 1
-    mask2 = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
+    # Convert image to numpy array
+    image_np = np.array(image)
 
-    # Apply the mask to the image
-    img = img * mask2[:, :, np.newaxis]
+    # Apply the mask to the image, removing background
+    result_image = image_np * mask[:, :, np.newaxis]
 
-    return img
+    # Create a transparent background
+    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2RGBA)
+    result_image[:, :, 3] = mask * 255
+
+    return Image.fromarray(result_image)
+
+
+
 
 def closest_colour(requested_colour):
     min_colours = {}
@@ -414,28 +448,27 @@ def get_color_name(hex_color):
     return color_name
 
 def extract_colors(image_path, num_colors=3):
-    # Remove the background from the image
-    img = remove_background(image_path)
-
-    # Convert image to RGB from BGR (OpenCV uses BGR)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    # Resize image to reduce processing time
-    img = cv2.resize(img, (600, 400), interpolation=cv2.INTER_AREA)
+    # Load the image
+    img = Image.open(image_path)
+    
+    # Convert image to RGB numpy array
+    img_np = np.array(img.convert('RGB'))
 
     # Reshape image to a list of pixels
-    img = img.reshape((img.shape[0] * img.shape[1], 3))
+    pixels = img_np.reshape((-1, 3))
 
-    # Remove black pixels (background)
-    img = img[~np.all(img == [0, 0, 0], axis=1)]
-
+    # If the original image was RGBA, create a mask for non-transparent pixels
+    if img.mode == 'RGBA':
+        alpha = np.array(img.split()[-1]).reshape((-1,))
+        pixels = pixels[alpha != 0]
+    
     # Check if there are enough pixels left after background removal
-    if len(img) == 0:
-        return [("#000000", "Black")]
+    if len(pixels) == 0:
+        return [("#FFFFFF", "White")]
 
     # Use KMeans to cluster pixels
     kmeans = KMeans(n_clusters=num_colors)
-    kmeans.fit(img)
+    kmeans.fit(pixels)
 
     # Get colors and counts
     counts = Counter(kmeans.labels_)
@@ -453,8 +486,13 @@ def extract_colors(image_path, num_colors=3):
     # Return list of tuples (hex_color, color_name)
     return list(zip(hex_colors, color_names))
 
+
 def rgb_to_hex(color):
-    return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
+    return "#{:02x}{:02x}{:02x}".format(
+        max(0, min(255, int(color[0]))),
+        max(0, min(255, int(color[1]))),
+        max(0, min(255, int(color[2])))
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -6,14 +6,21 @@
 <div class="content-container">
     <h1>Confirm Clothing Item</h1>
     <div class="image-container">
-        <img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Uploaded Image" width="300">
+        <div class="image-wrapper">
+            <h3>Original Image</h3>
+            <img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Original Image" width="300">
+        </div>
+        <div class="image-wrapper">
+            <h3>Processed Image</h3>
+            <img src="{{ url_for('static', filename='uploads/' + processed_filename) }}" alt="Processed Image" width="300">
+        </div>
     </div>
     <h2>Predicted Detailed Category: {{ predicted_category }}</h2>
     <h3>Confidence: {{ confidence }}%</h3>
     <i>Accessories & Footwear are not recognizable by the current model, sorry!</i>
     <h2>Mapped to Broader Category: {{ broader_category }}</h2>
     <form action="{{ url_for('confirm') }}" method="post" class="confirm-form">
-        <input type="hidden" name="filename" value="{{ filename }}">
+        <input type="hidden" name="filename" value="{{ processed_filename }}">
         <input type="hidden" name="detailed_category" value="{{ predicted_category }}">
         <div class="form-group">
             <label for="category">Confirm or change the category:</label>
@@ -51,7 +58,17 @@
         padding: 20px;
     }
     .image-container {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
         margin-bottom: 20px;
+    }
+    .image-wrapper {
+        text-align: center;
+    }
+    .image-wrapper img {
+        max-width: 300px;
+        height: auto;
     }
     .confirm-form {
         background-color: white;

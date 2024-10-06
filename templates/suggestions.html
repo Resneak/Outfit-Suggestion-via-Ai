@@ -1,53 +1,62 @@
 {% extends "base.html" %}
-
 {% block title %}Outfit Suggestions{% endblock %}
-
 {% block content %}
-<h1>Outfit Suggestions</h1>
-
-<!-- Add the category selection form -->
-<form method="get" action="{{ url_for('suggestions') }}" class="category-form">
-    <label>Select categories to include:</label><br><br>
-    {% for category in ['Top', 'Bottom', 'Footwear', 'Outerwear', 'Accessory'] %}
-        <label>
-            <input type="checkbox" name="categories" value="{{ category }}"
-            {% if category in selected_categories %} checked {% endif %}>
-            {{ category }}
-        </label>
-        &nbsp;&nbsp;
-    {% endfor %}
-    <br><br>
-    <button type="submit">Generate Suggestions</button>
-</form>
-
-{% if suggestions %}
-    <div class="outfit-container">
-        {% for suggestion in suggestions %}
-            <div class="outfit">
-                <h2>Score: {{ suggestion.score|round(2) }}</h2>
-                {% for category in selected_categories %}
-                    {% set item = suggestion.get(category.lower()) %}
-                    {% if item %}
-                    <div class="item">
-                        <p class="item-title">{{ category }}</p>
-                        <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ category }}">
-                        <p>Category: {{ item.category }}</p>
-                    </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
+<div class="content-container">
+    <h1>Outfit Suggestions</h1>
+    <!-- Add the category selection form -->
+    <form method="get" action="{{ url_for('suggestions') }}" class="category-form">
+        <label>Select categories to include:</label><br><br>
+        {% for category in ['Top', 'Bottom', 'Footwear', 'Outerwear', 'Accessory'] %}
+            <label>
+                <input type="checkbox" name="categories" value="{{ category }}"
+                {% if category in selected_categories %} checked {% endif %}>
+                {{ category }}
+            </label>
+            &nbsp;&nbsp;
         {% endfor %}
+        <br><br>
+        <button type="submit">Generate Suggestions</button>
+    </form>
+    <div class="score-explanation">
+        <em>Score is the difference in color between the clothing pieces.</em><br>
+        <em>The lower the score, the better the color match generally.</em>
     </div>
-{% else %}
-    <p>No outfit suggestions available. Please add more items to your wardrobe or adjust your category selections.</p>
-{% endif %}
-<a href="{{ url_for('home') }}">Upload More Items</a><br>
-<a href="{{ url_for('wardrobe') }}">View My Wardrobe</a>
+    {% if suggestions %}
+        <div class="outfit-container">
+            {% for suggestion in suggestions %}
+                <div class="outfit">
+                    <h2>Score: {{ suggestion.score|round(2) }}</h2>
+                    {% for category in selected_categories %}
+                        {% set item = suggestion.get(category.lower()) %}
+                        {% if item %}
+                        <div class="item">
+                            <p class="item-title">{{ category }}</p>
+                            <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ category }}">
+                            <p>Category: {{ item.category }}</p>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No outfit suggestions available. Please add more items to your wardrobe or adjust your category selections.</p>
+    {% endif %}
+    <div class="links-container">
+        <a href="{{ url_for('home') }}" class="nav-link">Upload More Items</a>
+        <a href="{{ url_for('wardrobe') }}" class="nav-link">View My Wardrobe</a>
+    </div>
+</div>
 {% endblock %}
-
 {% block head %}
 {{ super() }}
 <style>
+    .content-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
     .outfit-container {
         display: flex;
         flex-wrap: wrap;
@@ -78,6 +87,24 @@
     }
     .category-form input[type="checkbox"] {
         margin-right: 5px;
+    }
+    .score-explanation {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .links-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 600px;
+        margin-top: 20px;
+    }
+    .nav-link {
+        text-decoration: none;
+        color: #007bff;
+    }
+    .nav-link:hover {
+        text-decoration: underline;
     }
 </style>
 {% endblock %}
