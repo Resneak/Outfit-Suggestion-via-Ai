@@ -1,227 +1,460 @@
+# app.py
+
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import os
+import cv2
 import numpy as np
-import pandas as pd
-import tensorflow as tf
-import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from collections import Counter
+from flask_sqlalchemy import SQLAlchemy
+import webcolors
+from colormath.color_objects import sRGBColor, LabColor
+from colormath.color_conversions import convert_color
+from colormath.color_diff import delta_e_cie2000
+import requests
 
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.models import Model, load_model
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras import mixed_precision
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
+from fastai.vision.all import load_learner, PILImage
+from functools import partial
+import torch
 
-# Enable mixed precision
-mixed_precision.set_global_policy('mixed_float16')
+app = Flask(__name__)
 
-# Check GPU availability
-print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+# Configure upload folder
+UPLOAD_FOLDER = 'static/uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Define the base path to the dataset
-DATASET_BASE_PATH = "C:/Users/16292/Documents/AI_OUTFIT_PROJECT/deepfashion_dataset/"
+# Configure the SQLite database
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Silence the deprecation warning
+db = SQLAlchemy(app)  # Initialize the database
 
-# Load category names and types
-category_cloth = pd.read_csv(
-    os.path.join(DATASET_BASE_PATH, 'Anno_coarse/list_category_cloth.txt'),
-    sep='\s+', header=1
-)
+# Ensure the upload folder exists
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
-# Load image category labels
-category_img = pd.read_csv(
-    os.path.join(DATASET_BASE_PATH, 'Anno_coarse/list_category_img.txt'),
-    sep='\s+', header=1
-)
+OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY')
+if not OPENWEATHER_API_KEY:
+    raise RuntimeError("OpenWeather API key not found. Please set the OPENWEATHER_API_KEY environment variable.")
 
-# Load bounding boxes
-bbox = pd.read_csv(
-    os.path.join(DATASET_BASE_PATH, 'Anno_coarse/list_bbox.txt'),
-    sep='\s+', header=1
-)
+# Define the top_k_accuracy function to resolve the error
+def top_k_accuracy(inp, targ, k=3):
+    "Computes the Top-k accuracy for classification"
+    inp = inp.topk(k=k, dim=-1)[1]
+    targ = targ.unsqueeze(dim=-1)
+    return (inp == targ).any(dim=-1).float().mean()
 
-# Load evaluation partitions
-eval_partition = pd.read_csv(
-    os.path.join(DATASET_BASE_PATH, 'Eval/list_eval_partition.txt'),
-    sep='\s+', header=1
-)
+# Load the trained model when the app starts
+MODEL_PATH = './models/deepfashion_resnet34.pkl'
+learn = load_learner(MODEL_PATH)
 
-# Merge dataframes
-data = pd.merge(category_img, eval_partition, on='image_name')
-data = pd.merge(data, bbox, on='image_name')
-
-# Adjust category labels to start from 0
-data['category_label'] = data['category_label'] - 1
-
-# Create training, validation, and test sets
-train_data = data[data['evaluation_status'] == 'train'].reset_index(drop=True)
-val_data = data[data['evaluation_status'] == 'val'].reset_index(drop=True)
-test_data = data[data['evaluation_status'] == 'test'].reset_index(drop=True)
-
-# Define the image preprocessing function with augmentation
-def load_and_preprocess_image_with_augmentation(row):
-    image_path = tf.strings.join([DATASET_BASE_PATH, row['image_name']], separator=os.sep)
-    img = tf.io.read_file(image_path)
-    img = tf.image.decode_jpeg(img, channels=3)
-    
-    x1 = tf.cast(row['x_1'], tf.int32)
-    y1 = tf.cast(row['y_1'], tf.int32)
-    x2 = tf.cast(row['x_2'], tf.int32)
-    y2 = tf.cast(row['y_2'], tf.int32)
-    
-    shape = tf.shape(img)
-    h = shape[0]
-    w = shape[1]
-    x1 = tf.clip_by_value(x1, 0, w)
-    y1 = tf.clip_by_value(y1, 0, h)
-    x2 = tf.clip_by_value(x2, 0, w)
-    y2 = tf.clip_by_value(y2, 0, h)
-    
-    img_cropped = img[y1:y2, x1:x2]
-    img_resized = tf.image.resize(img_cropped, [224, 224])
-    img_normalized = img_resized / 255.0
-    
-    # Apply data augmentation
-    img_aug = tf.image.random_flip_left_right(img_normalized)
-    img_aug = tf.image.random_brightness(img_aug, max_delta=0.1)
-    img_aug = tf.image.random_contrast(img_aug, lower=0.9, upper=1.1)
-    img_aug = tf.image.random_saturation(img_aug, lower=0.9, upper=1.1)
-    
-    return img_aug
-
-# Original image preprocessing function
-def load_and_preprocess_image(row):
-    image_path = tf.strings.join([DATASET_BASE_PATH, row['image_name']], separator=os.sep)
-    img = tf.io.read_file(image_path)
-    img = tf.image.decode_jpeg(img, channels=3)
-    
-    x1 = tf.cast(row['x_1'], tf.int32)
-    y1 = tf.cast(row['y_1'], tf.int32)
-    x2 = tf.cast(row['x_2'], tf.int32)
-    y2 = tf.cast(row['y_2'], tf.int32)
-    
-    shape = tf.shape(img)
-    h = shape[0]
-    w = shape[1]
-    x1 = tf.clip_by_value(x1, 0, w)
-    y1 = tf.clip_by_value(y1, 0, h)
-    x2 = tf.clip_by_value(x2, 0, w)
-    y2 = tf.clip_by_value(y2, 0, h)
-    
-    img_cropped = img[y1:y2, x1:x2]
-    img_resized = tf.image.resize(img_cropped, [224, 224])
-    img_normalized = img_resized / 255.0
-    
-    return img_normalized
-
-# Create TensorFlow datasets
-def create_tf_dataset(data, batch_size, shuffle=True, augment=False):
-    image_names = tf.constant(data['image_name'].values)
-    category_labels = tf.constant(data['category_label'].values, dtype=tf.int32)
-    x1 = tf.constant(data['x_1'].values, dtype=tf.int32)
-    y1 = tf.constant(data['y_1'].values, dtype=tf.int32)
-    x2 = tf.constant(data['x_2'].values, dtype=tf.int32)
-    y2 = tf.constant(data['y_2'].values, dtype=tf.int32)
-    
-    dataset = tf.data.Dataset.from_tensor_slices({
-        'image_name': image_names,
-        'category_label': category_labels,
-        'x_1': x1,
-        'y_1': y1,
-        'x_2': x2,
-        'y_2': y2
-    })
-    
-    if shuffle:
-        dataset = dataset.shuffle(buffer_size=10000)
-    
-    if augment:
-        dataset = dataset.map(lambda row: (load_and_preprocess_image_with_augmentation(row), row['category_label']), num_parallel_calls=tf.data.AUTOTUNE)
-    else:
-        dataset = dataset.map(lambda row: (load_and_preprocess_image(row), row['category_label']), num_parallel_calls=tf.data.AUTOTUNE)
-    
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(tf.data.AUTOTUNE)
-    return dataset
-
-# Set the batch size
-batch_size = 128  # Adjust based on your GPU memory
-
-# Create datasets
-train_dataset = create_tf_dataset(train_data, batch_size=batch_size, shuffle=True, augment=True)
-val_dataset = create_tf_dataset(val_data, batch_size=batch_size, shuffle=False, augment=False)
-
-# Update the path to save the model within the current project folder
-model_save_dir = "C:/Users/16292/Documents/AI_OUTFIT_PROJECT/models"
-if not os.path.exists(model_save_dir):
-    os.makedirs(model_save_dir)
-
-# Check if model already exists
-model_path = os.path.join(model_save_dir, 'clothing_classifier.h5')
-
-if os.path.exists(model_path):
-    # Load the saved model
-    model = load_model(model_path)
-    print("Model loaded from disk.")
+# Get the list of detailed categories from the model's data
+if learn and hasattr(learn.dls, 'vocab'):
+    DETAILED_CATEGORIES = learn.dls.vocab
 else:
-    # Build the model
-    base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
-    
-    # Fine-tune the base model
-    base_model.trainable = True
-    for layer in base_model.layers[:-50]:
-        layer.trainable = False
-    
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
-    x = Dense(256, activation='relu')(x)
-    x = Dropout(0.5)(x)
-    predictions = Dense(category_cloth.shape[0], activation='softmax', dtype='float32')(x)
-    model = Model(inputs=base_model.input, outputs=predictions)
-    
-    # Compile the model with a lower learning rate
-    optimizer = Adam(learning_rate=1e-5)
-    model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    
-    # Define callbacks
-    early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=2)
-    model_checkpoint = ModelCheckpoint(filepath=model_path, save_best_only=True)
-    callbacks = [early_stopping, reduce_lr, model_checkpoint]
-    
-    # Train the model
-    epochs = 10  # Increase the number of epochs
-    history = model.fit(
-        train_dataset,
-        validation_data=val_dataset,
-        epochs=epochs,
-        callbacks=callbacks
+    DETAILED_CATEGORIES = []  # Fallback if model loading fails
+
+# Define the mapping from detailed categories to broader categories
+CATEGORY_MAPPING = {
+    # Top categories
+    'Anorak': 'Top',
+    'Blazer': 'Top',
+    'Blouse': 'Top',
+    'Bomber': 'Top',
+    'Button-Down': 'Top',
+    'Cardigan': 'Top',
+    'Flannel': 'Top',
+    'Halter': 'Top',
+    'Henley': 'Top',
+    'Hoodie': 'Top',
+    'Jacket': 'Top',
+    'Jersey': 'Top',
+    'Sweater': 'Top',
+    'Tank': 'Top',
+    'Tee': 'Top',
+    'Top': 'Top',
+    'Turtleneck': 'Top',
+
+    # Bottom categories
+    'Capris': 'Bottom',
+    'Chinos': 'Bottom',
+    'Culottes': 'Bottom',
+    'Cutoffs': 'Bottom',
+    'Gauchos': 'Bottom',
+    'Jeans': 'Bottom',
+    'Jeggings': 'Bottom',
+    'Jodhpurs': 'Bottom',
+    'Joggers': 'Bottom',
+    'Leggings': 'Bottom',
+    'Sarong': 'Bottom',
+    'Shorts': 'Bottom',
+    'Skirt': 'Bottom',
+    'Sweatpants': 'Bottom',
+    'Sweatshorts': 'Bottom',
+    'Trunks': 'Bottom',
+
+    # Outerwear categories
+    'Parka': 'Outerwear',
+    'Peacoat': 'Outerwear',
+    'Poncho': 'Outerwear',
+    'Caftan': 'Outerwear',
+    'Cape': 'Outerwear',
+    'Coat': 'Outerwear',
+
+    # Dress/Full Body categories
+    'Coverup': 'Dress',
+    'Dress': 'Dress',
+    'Jumpsuit': 'Dress',
+    'Kaftan': 'Dress',
+    'Kimono': 'Dress',
+    'Nightdress': 'Dress',
+    'Onesie': 'Dress',
+    'Robe': 'Dress',
+    'Romper': 'Dress',
+    'Shirtdress': 'Dress',
+    'Sundress': 'Dress'
+}
+
+
+# Define the list of broader categories
+CATEGORY_LIST = ['Top', 'Bottom', 'Outerwear', 'Footwear', 'Accessory', 'Dress']
+
+class ClothingItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    image_filename = db.Column(db.String(100), nullable=False)
+    colors = db.Column(db.String(500), nullable=False)
+    category = db.Column(db.String(50), nullable=False)  # Broader category
+    detailed_category = db.Column(db.String(50), nullable=False)  # Detailed category
+
+    def __repr__(self):
+        return f'<ClothingItem {self.id}>'
+
+with app.app_context():
+    db.create_all()
+
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ ROUTES
+
+@app.route('/')
+def home():
+    items = ClothingItem.query.all()
+    return render_template('index.html', items=items)
+
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return 'Missing file', 400
+
+        file = request.files['file']
+
+        if file.filename == '':
+            return 'No selected file', 400
+
+        if file:
+            filename = file.filename
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+
+            # Process the image for color extraction
+            colors = extract_colors(filepath)
+
+            # Predict category using the model
+            if learn:
+                try:
+                    pred_class, pred_idx, probs = learn.predict(filepath)
+                    confidence = round(probs[pred_idx].item() * 100)  # Convert to percentage and round to nearest whole number
+                    detailed_category = pred_class
+                    broader_category = CATEGORY_MAPPING.get(detailed_category, 'Accessory')
+                    print(f"Predicted Category: {detailed_category} -> {broader_category}, Confidence: {confidence:.2f}%")
+                except Exception as e:
+                    print(f"Error during prediction: {e}")
+                    detailed_category = "Unknown"
+                    broader_category = "Accessory"  # Default to 'Accessory' if prediction fails
+                    confidence = 0
+            else:
+                detailed_category = "Unknown"
+                broader_category = "Accessory"
+                confidence = 0
+
+            # Render a template to display the image, extracted colors, and predicted category
+            return render_template(
+                'confirm.html',
+                colors=colors,
+                filename=filename,
+                predicted_category=detailed_category,
+                broader_category=broader_category,
+                categories=CATEGORY_LIST,
+                confidence=confidence
+            )
+    else:
+        # If GET request, render the upload page
+        return render_template('upload.html')
+
+
+@app.route('/confirm', methods=['POST'])
+def confirm():
+    # Get data from the form submission
+    filename = request.form.get('filename')
+    category = request.form.get('category')
+    detailed_category = request.form.get('detailed_category', 'Unknown')
+
+    if not filename or not category:
+        return 'Missing data', 400
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    # Re-extract colors in case this route is accessed directly
+    colors = extract_colors(filepath)
+
+    # Save to database
+    colors_str = ';'.join([f"{hex_color},{color_name}" for hex_color, color_name in colors])
+    new_item = ClothingItem(
+        image_filename=filename,
+        colors=colors_str,
+        category=category,  # Broader category selected by the user
+        detailed_category=detailed_category
     )
-    
-    print("Model trained and saved to disk.")
+    db.session.add(new_item)
+    db.session.commit()
 
-# Evaluate the model
-val_loss, val_accuracy = model.evaluate(val_dataset)
-print(f"\nValidation Loss: {val_loss}")
-print(f"Validation Accuracy: {val_accuracy}")
+    # Redirect to wardrobe or render a success page
+    return redirect(url_for('wardrobe'))
 
-# Plot training & validation accuracy and loss only if 'history' exists
-if 'history' in locals():
-    plt.figure(figsize=(12, 4))
+# Route to delete a clothing item
+@app.route('/delete_item/<int:item_id>', methods=['POST'])
+def delete_item(item_id):
+    item = ClothingItem.query.get(item_id)
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+    return redirect(url_for('wardrobe'))
 
-    plt.subplot(1, 2, 1)
-    plt.plot(history.history['accuracy'], label='Train Accuracy')
-    plt.plot(history.history['val_accuracy'], label='Val Accuracy')
-    plt.title('Model Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend(loc='upper left')
+@app.route('/wardrobe')
+def wardrobe():
+    items = ClothingItem.query.all()
+    return render_template('wardrobe.html', items=items)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(history.history['loss'], label='Train Loss')
-    plt.plot(history.history['val_loss'], label='Val Loss')
-    plt.title('Model Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend(loc='upper left')
+@app.route('/suggestions', methods=['GET'])
+def suggestions():
+    # Get selected categories from the query parameters
+    selected_categories = request.args.getlist('categories')
 
-    plt.tight_layout()
-    plt.show()
+    # If no categories are selected, default to mandatory categories
+    if not selected_categories:
+        selected_categories = ['Top', 'Bottom', 'Footwear']  # Default categories
+
+    # Call the suggestion function with selected categories
+    suggestions = suggest_outfits(selected_categories)
+
+    return render_template('suggestions.html', suggestions=suggestions, selected_categories=selected_categories)
+
+@app.route('/get_weather', methods=['POST'])
+def get_weather():
+    data = request.get_json()
+    lat = data.get('lat')
+    lon = data.get('lon')
+
+    if not lat or not lon:
+        return jsonify({'error': 'Missing latitude or longitude'}), 400
+
+    # Build the API URL
+    url = 'https://api.openweathermap.org/data/2.5/weather'
+    params = {
+        'lat': lat,
+        'lon': lon,
+        'appid': OPENWEATHER_API_KEY,
+        'units': 'imperial'  # Use 'imperial' for Fahrenheit
+    }
+
+    # Make the API request
+    response = requests.get(url, params=params)
+
+    if response.status_code == 200:
+        weather_data = response.json()
+        # Extract weather information
+        description = weather_data['weather'][0]['description'].capitalize()
+        temp = round(weather_data['main']['temp'])
+        icon_code = weather_data['weather'][0]['icon']
+        # Build the icon URL
+        icon_url = f"http://openweathermap.org/img/wn/{icon_code}@2x.png"
+        # Prepare data to send to the client
+        weather_info = {
+            'description': description,
+            'temp': temp,
+            'icon_url': icon_url
+        }
+        return jsonify(weather_info)
+    else:
+        print(f"OpenWeather API Error: {response.status_code} - {response.text}")
+        return jsonify({'error': 'Failed to retrieve weather data'}), response.status_code
+
+# -+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ FUNCTIONS
+
+def predict_category(image_path):
+    img = PILImage.create(image_path)
+    pred_class, pred_idx, outputs = learn.predict(img)
+    detailed_category = str(pred_class)
+    # Map to broader category
+    broader_category = CATEGORY_MAPPING.get(detailed_category, 'Accessory')  # Default to 'Accessory' if not found
+    return detailed_category, broader_category
+
+def get_lab_color(hex_color):
+    rgb = sRGBColor.new_from_rgb_hex(hex_color)
+    lab = convert_color(rgb, LabColor)
+    return lab
+
+def calculate_color_difference(color1, color2):
+    lab1 = get_lab_color(color1)
+    lab2 = get_lab_color(color2)
+    delta_e = delta_e_cie2000(lab1, lab2)
+    return delta_e
+
+def suggest_outfits(selected_categories):
+    # Get all items from the database
+    items = ClothingItem.query.all()
+
+    # Separate items by category
+    categories = {cat: [] for cat in CATEGORY_LIST}
+    for item in items:
+        if item.category in categories:
+            categories[item.category].append(item)
+
+    suggestions = []
+
+    # Ensure that for selected categories, there are items available
+    for cat in selected_categories:
+        if not categories.get(cat):
+            # No items in this category; cannot generate outfits
+            return suggestions
+
+    from itertools import product
+
+    # Prepare a list of item lists for selected categories
+    selected_items = [categories[cat] for cat in selected_categories]
+
+    # Generate all combinations of selected items
+    for combination in product(*selected_items):
+        outfit = {}
+        hex_colors = []
+        for item in combination:
+            category = item.category.lower()
+            outfit[category] = item
+            # Get the main color
+            item_colors = [pair.split(',')[0] for pair in item.colors.split(';') if pair]
+            if item_colors:
+                hex_colors.append(item_colors[0])
+
+        # Calculate average color difference between all pairs
+        from itertools import combinations
+        pair_diffs = []
+        for color1, color2 in combinations(hex_colors, 2):
+            diff = calculate_color_difference(color1, color2)
+            pair_diffs.append(diff)
+
+        if pair_diffs:
+            avg_color_diff = sum(pair_diffs) / len(pair_diffs)
+        else:
+            avg_color_diff = 0
+
+        # Decide whether to include the outfit based on color difference
+        # Adjust thresholds as needed
+        if 20 < avg_color_diff < 40:
+            outfit['score'] = avg_color_diff
+            suggestions.append(outfit)
+
+    # Sort suggestions by score
+    suggestions.sort(key=lambda x: x['score'])
+
+    return suggestions
+
+def remove_background(image_path):
+    img = cv2.imread(image_path)
+    mask = np.zeros(img.shape[:2], np.uint8)
+
+    # Create temporary arrays used by GrabCut algorithm
+    bgdModel = np.zeros((1, 65), np.float64)
+    fgdModel = np.zeros((1, 65), np.float64)
+
+    # Define the rectangle that contains the object to segment
+    height, width = img.shape[:2]
+    rect = (10, 10, width - 20, height - 20)
+
+    # Apply GrabCut algorithm
+    cv2.grabCut(img, mask, rect, bgdModel, fgdModel, 5, cv2.GC_INIT_WITH_RECT)
+
+    # Create a mask where sure background and possible background pixels are set to 0, and the rest to 1
+    mask2 = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
+
+    # Apply the mask to the image
+    img = img * mask2[:, :, np.newaxis]
+
+    return img
+
+def closest_colour(requested_colour):
+    min_colours = {}
+    css3_names = webcolors.CSS3_NAMES_TO_HEX
+
+    for name, hex_code in css3_names.items():
+        r_c, g_c, b_c = webcolors.hex_to_rgb(hex_code)
+        rd = (r_c - requested_colour[0]) ** 2
+        gd = (g_c - requested_colour[1]) ** 2
+        bd = (b_c - requested_colour[2]) ** 2
+        min_colours[rd + gd + bd] = name
+
+    closest_name = min_colours[min(min_colours.keys())]
+    return closest_name
+
+def get_color_name(hex_color):
+    try:
+        color_name = webcolors.hex_to_name(hex_color, spec='css3')
+    except ValueError:
+        # If the exact color name is not found, find the closest match
+        rgb_color = webcolors.hex_to_rgb(hex_color)
+        color_name = closest_colour(rgb_color)
+    return color_name
+
+def extract_colors(image_path, num_colors=3):
+    # Remove the background from the image
+    img = remove_background(image_path)
+
+    # Convert image to RGB from BGR (OpenCV uses BGR)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # Resize image to reduce processing time
+    img = cv2.resize(img, (600, 400), interpolation=cv2.INTER_AREA)
+
+    # Reshape image to a list of pixels
+    img = img.reshape((img.shape[0] * img.shape[1], 3))
+
+    # Remove black pixels (background)
+    img = img[~np.all(img == [0, 0, 0], axis=1)]
+
+    # Check if there are enough pixels left after background removal
+    if len(img) == 0:
+        return [("#000000", "Black")]
+
+    # Use KMeans to cluster pixels
+    kmeans = KMeans(n_clusters=num_colors)
+    kmeans.fit(img)
+
+    # Get colors and counts
+    counts = Counter(kmeans.labels_)
+    center_colors = kmeans.cluster_centers_
+
+    # Sort colors by frequency
+    ordered_colors = [center_colors[i] for i in counts.keys()]
+
+    # Convert RGB to Hex
+    hex_colors = [rgb_to_hex(ordered_colors[i]) for i in range(len(ordered_colors))]
+
+    # Get color names
+    color_names = [get_color_name(hex_colors[i]) for i in range(len(hex_colors))]
+
+    # Return list of tuples (hex_color, color_name)
+    return list(zip(hex_colors, color_names))
+
+def rgb_to_hex(color):
+    return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
+
+if __name__ == '__main__':
+    app.run(debug=True)

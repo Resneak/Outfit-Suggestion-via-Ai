@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Clothing Item{% endblock %}
+
+{% block content %}
+<div class="content-container">
+    <h1>Confirm Clothing Item</h1>
+    <div class="image-container">
+        <img src="{{ url_for('static', filename='uploads/' + filename) }}" alt="Uploaded Image" width="300">
+    </div>
+    <h2>Predicted Detailed Category: {{ predicted_category }}</h2>
+    <h3>Confidence: {{ confidence }}%</h3>
+    <i>Accessories & Footwear are not recognizable by the current model, sorry!</i>
+    <h2>Mapped to Broader Category: {{ broader_category }}</h2>
+    <form action="{{ url_for('confirm') }}" method="post" class="confirm-form">
+        <input type="hidden" name="filename" value="{{ filename }}">
+        <input type="hidden" name="detailed_category" value="{{ predicted_category }}">
+        <div class="form-group">
+            <label for="category">Confirm or change the category:</label>
+            <select name="category" id="category" required>
+                {% for category in categories %}
+                    <option value="{{ category }}" {% if category == broader_category %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <input type="submit" value="Save Item" class="submit-btn">
+        </div>
+    </form>
+    <div class="colors-container">
+        <h2>Extracted Colors:</h2>
+        <ul class="color-list">
+            {% for hex_color, color_name in colors %}
+                <li style="color: {{ hex_color }};">
+                    <span class="color-swatch" style="background-color: {{ hex_color }};"></span>
+                    {{ color_name }} ({{ hex_color }})
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .content-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
+    .image-container {
+        margin-bottom: 20px;
+    }
+    .confirm-form {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    .form-group:last-child {
+        display: flex;
+        justify-content: center;
+    }
+    .submit-btn {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .submit-btn:hover {
+        background-color: #45a049;
+    }
+    .colors-container {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .color-list {
+        list-style-type: none;
+        padding: 0;
+    }
+    .color-list li {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+    }
+    .color-swatch {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        margin-right: 10px;
+        border: 1px solid #000;
+    }
+</style>
+{% endblock %}

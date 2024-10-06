@@ -3,44 +3,82 @@
 {% block title %}My Wardrobe{% endblock %}
 
 {% block content %}
-<h1>My Wardrobe</h1>
-<div>
-    {% for item in items %}
-        <div class="item">
-            <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Clothing Item">
-            <p>Category: {{ item.category }}</p>
-            <div>
-                <!-- Split the colors field by semicolon and display each color -->
-                {% for color_pair in item.colors.split(';') %}
-                    {% if color_pair %}
-                        {% set hex_color = color_pair.split(',')[0] %}
-                        <div class="color-container">
-                            <div class="color-box" style="background-color: {{ hex_color }};"></div>
-                            <p class="color-label">{{ hex_color }}</p>
+<div class="content-container">
+    <h1>My Wardrobe</h1>
+    {% set categories = ['Top', 'Bottom', 'Outerwear', 'Footwear', 'Accessory', 'Dress'] %}
+    {% for category in categories %}
+        <div class="category-section">
+            <h2>{{ category }}</h2>
+            <div class="wardrobe-container">
+                {% for item in items if item.category == category %}
+                    <div class="item">
+                        <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Clothing Item">
+                        <div>
+                            {% for color_pair in item.colors.split(';') %}
+                                {% if color_pair %}
+                                    {% set hex_color = color_pair.split(',')[0] %}
+                                    <div class="color-container">
+                                        <div class="color-box" style="background-color: {{ hex_color }};"></div>
+                                        <p class="color-label">{{ hex_color }}</p>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
                         </div>
-                    {% endif %}
+                        <form action="{{ url_for('delete_item', item_id=item.id) }}" method="post" class="delete-form">
+                            <button type="submit" class="delete-btn">Delete</button>
+                        </form>
+                    </div>
+                {% else %}
+                    <p class="no-items">No {{ category }} items yet.</p>
                 {% endfor %}
             </div>
         </div>
-    {% else %}
-        <p>No items in your wardrobe yet.</p>
     {% endfor %}
+    <div class="links-container">
+        <a href="{{ url_for('home') }}" class="nav-link">Upload More Items</a>
+        <a href="{{ url_for('suggestions') }}" class="nav-link">Get Outfit Suggestions</a>
+    </div>
 </div>
-<a href="{{ url_for('home') }}">Upload More Items</a><br>
-<a href="{{ url_for('suggestions') }}">Get Outfit Suggestions</a>
 {% endblock %}
 
 {% block head %}
 {{ super() }}
 <style>
+    .content-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
+    .category-section {
+        width: 100%;
+        margin-bottom: 30px;
+    }
+    .category-section h2 {
+        text-align: left;
+        margin-bottom: 10px;
+        border-bottom: 2px solid #000;
+        padding-bottom: 5px;
+    }
+    .wardrobe-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 20px;
+    }
     .item {
+        position: relative;
         display: inline-block;
-        margin: 10px;
         text-align: center;
+        transition: transform 0.2s ease;
     }
     .item img {
         width: 150px;
-        height: auto;
+        height: 200px;
+        object-fit: cover;
+    }
+    .item:hover {
+        transform: scale(1.05);
     }
     .color-box {
         display: inline-block;
@@ -56,6 +94,47 @@
     }
     .color-label {
         margin-left: 5px;
+    }
+    .delete-form {
+        display: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    .item:hover .delete-form {
+        display: block;
+    }
+    .delete-btn {
+        background-color: red;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 14px;
+        cursor: pointer;
+        opacity: 0.8;
+        transition: opacity 0.2s ease-in-out;
+    }
+    .delete-btn:hover {
+        opacity: 1;
+    }
+    .links-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 600px;
+        margin-top: 20px;
+    }
+    .nav-link {
+        text-decoration: none;
+        color: #007bff;
+    }
+    .nav-link:hover {
+        text-decoration: underline;
+    }
+    .no-items {
+        font-style: italic;
+        color: #000000;
     }
 </style>
 {% endblock %}

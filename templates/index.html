@@ -1,25 +1,154 @@
+<!-- templates/index.html -->
 {% extends "base.html" %}
 
 {% block title %}Upload Clothing Item{% endblock %}
 
 {% block content %}
-<h1>Upload a Clothing Item</h1>
-<form action="/upload" method="post" enctype="multipart/form-data">
-    <label for="file">Choose an image:</label>
-    <input type="file" name="file" id="file" accept="image/*" required><br><br>
+<div class="content-container">
+    <h1 class="centered-title">Upload a Clothing Item</h1>
+    <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" class="centered-form">
+        <div class="file-input-container">
+            <label for="file">Choose an image:</label>
+            <input type="file" name="file" id="file" accept="image/*" required>
+        </div>
+        <button type="submit" class="upload-button">Upload</button>
+    </form>
+    <div class="links-container">
+        <a href="{{ url_for('wardrobe') }}" class="nav-link">View My Wardrobe</a>
+        <a href="{{ url_for('suggestions') }}" class="nav-link">Get Outfit Suggestions</a>
+    </div>
+</div>
+{% endblock %}
 
-    <label for="category">Select Category:</label>
-    <select name="category" id="category" required>
-        <option value="">--Select Category--</option>
-        <option value="Top">Top</option>
-        <option value="Bottom">Bottom</option>
-        <option value="Outerwear">Outerwear</option>
-        <option value="Footwear">Footwear</option>
-        <option value="Accessory">Accessory</option>
-    </select><br><br>
+{% block extra_content %}
 
-    <button type="submit">Upload</button>
-</form>
-<a href="{{ url_for('wardrobe') }}">View My Wardrobe</a><br>
-<a href="{{ url_for('suggestions') }}">Get Outfit Suggestions</a>
+<div class="scrolling-wardrobe">
+    <div class="scrolling-container">
+        {% for item in items %}
+        <div class="wardrobe-item">
+            <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Wardrobe Item">
+        </div>
+        {% endfor %}
+        {% for item in items %}
+        <div class="wardrobe-item">
+            <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Wardrobe Item">
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    /* Global styles */
+    body {
+        font-family: Arial, sans-serif;
+    }
+
+    .content-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .centered-title {
+        text-align: center;
+    }
+
+    .centered-form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .file-input-container {
+        margin-bottom: 10px;
+        text-align: center;
+    }
+
+    .upload-button {
+        padding: 10px 20px;
+        background-color: #000000;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+
+    .links-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 600px;
+    }
+
+    .nav-link {
+        text-decoration: none;
+        color: #007bff;
+    }
+
+    #weather-info {
+        background-color: #a3a3a3;
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #weather-icon {
+        width: 50px;
+        height: 50px;
+    }
+    #weather-text {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-left: 10px;
+    }
+
+    /* Scrolling wardrobe styles */
+    .scrolling-wardrobe {
+        width: 100%;
+        overflow: hidden;
+        background-color: #000000;
+        padding: 10px 0;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+    }
+
+    .scrolling-container {
+        display: flex;
+        flex-wrap: nowrap;
+        animation: scroll-left 30s linear infinite;
+    }
+
+    .wardrobe-item {
+        flex: 0 0 auto;
+        margin: 0 10px;
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .wardrobe-item img {
+        width: 200px;
+        height: auto;
+    }
+
+    /* Pause the scroll on hover */
+    .scrolling-wardrobe:hover .scrolling-container {
+        animation-play-state: paused;
+    }
+
+    /* Slightly enlarge image on hover */
+    .wardrobe-item:hover {
+        transform: scale(1.2);
+    }
+
+    /* Keyframe for seamless scrolling */
+    @keyframes scroll-left {
+        0% {
+            transform: translateX(0);
+        }
+        100% {
+            transform: translateX(-50%);
+        }
+    }
+</style>
 {% endblock %}

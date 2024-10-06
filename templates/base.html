@@ -6,9 +6,17 @@
     <title>{% block title %}AI Outfit Project{% endblock %}</title>
     {% endblock %}
     <style>
+        /* Add grey background to body */
+        body {
+            background-color: #a3a3a3; /* Light grey background */
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
         /* Include any global styles here */
         #weather-info {
-            background-color: #e0f7fa;
+            background-color: #a3a3a3;
             padding: 10px;
             display: flex;
             align-items: center;
@@ -23,9 +31,50 @@
             font-weight: bold;
             margin-left: 10px;
         }
+
+        /* Flex container to allow horizontal scrolling */
+        .scrolling-wardrobe {
+            width: 100%;
+            overflow: hidden;
+            background-color: #a3a3a3;
+            padding: 10px 0;
+            position: fixed;
+            bottom: 0; /* Ensure it's at the bottom */
+            left: 0;
+        }
+
+        .scrolling-container {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            animation: scroll-left 30s linear infinite;
+        }
+
+        .wardrobe-item {
+            flex: 0 0 auto; /* Prevent items from shrinking or growing */
+            margin: 0 10px;
+            transition: transform 0.2s ease-in-out;
+        }
+
+        /* Pause scrolling when hovered */
+        .scrolling-wardrobe:hover .scrolling-container {
+            animation-play-state: paused;
+        }
+
+        /* Enlarge the image when hovered */
+        .wardrobe-item:hover {
+            transform: scale(1.1);
+        }
+
+        @keyframes scroll-left {
+            from {
+                transform: translateX(0);
+            }
+            to {
+                transform: translateX(-50%);
+            }
+        }
     </style>
-    
-    
 </head>
 <body>
     <!-- Weather display at the top -->
@@ -36,7 +85,10 @@
 
     {% block content %}{% endblock %}
 
-    <!-- Include JavaScript -->
+    <!-- Include the block for extra content such as the wardrobe at the bottom -->
+    {% block extra_content %}{% endblock %}
+
+    <!-- Include JavaScript for weather -->
     <script>
         // Check if the browser supports geolocation
         if (navigator.geolocation) {
@@ -86,5 +138,4 @@
         }
     </script>
 </body>
-
 </html>
