@@ -36,14 +36,11 @@
     </form>
     <div class="colors-container">
         <h2>Extracted Colors:</h2>
-        <ul class="color-list">
-            {% for hex_color, color_name in colors %}
-                <li style="color: {{ hex_color }};">
-                    <span class="color-swatch" style="background-color: {{ hex_color }};"></span>
-                    {{ color_name }} ({{ hex_color }})
-                </li>
+        <div class="color-tags">
+            {% for color in colors %}
+                <span class="color-tag" style="background-color: {{ color.lower() }};">{{ color }}</span>
             {% endfor %}
-        </ul>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -116,6 +113,39 @@
         height: 20px;
         margin-right: 10px;
         border: 1px solid #000;
+    }
+    .color-list {
+        list-style-type: none;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .color-list li {
+        margin: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .color-swatch {
+        display: block;
+        width: 30px;
+        height: 30px;
+        margin-bottom: 5px;
+        border: 1px solid #000;
+    }
+    .color-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+    .color-tag {
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 14px;
+        color: white;
+        text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
     }
 </style>
 {% endblock %}

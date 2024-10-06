@@ -1,6 +1,7 @@
 # app.py
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify
+import requests
 import os
 import cv2
 import numpy as np
@@ -11,7 +12,12 @@ import webcolors
 from colormath.color_objects import sRGBColor, LabColor
 from colormath.color_conversions import convert_color
 from colormath.color_diff import delta_e_cie2000
-import requests
+
+import colorsys
+from colormath.color_objects import sRGBColor, LabColor
+from colormath.color_conversions import convert_color
+from colormath.color_diff import delta_e_cie2000
+
 
 from fastai.vision.all import load_learner, PILImage
 from functools import partial
@@ -134,9 +140,9 @@ CATEGORY_LIST = ['Top', 'Bottom', 'Outerwear', 'Footwear', 'Accessory', 'Dress']
 class ClothingItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     image_filename = db.Column(db.String(100), nullable=False)
-    colors = db.Column(db.String(500), nullable=False)
-    category = db.Column(db.String(50), nullable=False)  # Broader category
-    detailed_category = db.Column(db.String(50), nullable=False)  # Detailed category
+    colors = db.Column(db.String(500), nullable=False) 
+    category = db.Column(db.String(50), nullable=False)
+    detailed_category = db.Column(db.String(50), nullable=False)
 
     def __repr__(self):
         return f'<ClothingItem {self.id}>'
@@ -209,6 +215,13 @@ def upload():
         # If GET request, render the upload page
         return render_template('upload.html')
 
+@app.route('/delete_item/<int:item_id>', methods=['POST'])
+def delete_item(item_id):
+    item = ClothingItem.query.get_or_404(item_id)
+    db.session.delete(item)
+    db.session.commit()
+    return redirect(url_for('wardrobe'))
+
 @app.route('/confirm', methods=['POST'])
 def confirm():
     # Get data from the form submission
@@ -221,15 +234,15 @@ def confirm():
 
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
-    # Re-extract colors in case this route is accessed directly
+    # Extract colors
     colors = extract_colors(filepath)
 
     # Save to database
-    colors_str = ';'.join([f"{hex_color},{color_name}" for hex_color, color_name in colors])
+    colors_str = ','.join(colors)
     new_item = ClothingItem(
         image_filename=filename,
         colors=colors_str,
-        category=category,  # Broader category selected by the user
+        category=category,
         detailed_category=detailed_category
     )
     db.session.add(new_item)
@@ -238,19 +251,21 @@ def confirm():
     # Redirect to wardrobe or render a success page
     return redirect(url_for('wardrobe'))
 
-# Route to delete a clothing item
-@app.route('/delete_item/<int:item_id>', methods=['POST'])
-def delete_item(item_id):
-    item = ClothingItem.query.get(item_id)
-    if item:
-        db.session.delete(item)
-        db.session.commit()
-    return redirect(url_for('wardrobe'))
+@app.route('/filter_by_color/<color>')
+def filter_by_color(color):
+    items = ClothingItem.query.filter(ClothingItem.colors.like(f'%{color}%')).all()
+    all_colors = set()
+    for item in items:
+        all_colors.update(item.colors.split(','))
+    return render_template('wardrobe.html', items=items, all_colors=sorted(all_colors))
 
 @app.route('/wardrobe')
 def wardrobe():
     items = ClothingItem.query.all()
-    return render_template('wardrobe.html', items=items)
+    all_colors = set()
+    for item in items:
+        all_colors.update(item.colors.split(','))
+    return render_template('wardrobe.html', items=items, all_colors=sorted(all_colors))
 
 @app.route('/suggestions', methods=['GET'])
 def suggestions():
@@ -447,6 +462,44 @@ def get_color_name(hex_color):
         color_name = closest_colour(rgb_color)
     return color_name
 
+def get_broad_color_name(rgb_color):
+    r, g, b = [x/255.0 for x in rgb_color]
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    
+    # Convert hue to degrees
+    h *= 360
+    
+    # Adjust thresholds for better detection of light, desaturated colors
+    if s < 0.2:  # Increased threshold for low saturation
+        if v > 0.9:
+            return 'White'
+        elif v < 0.2:
+            return 'Black'
+        elif 0.2 <= v < 0.6:
+            return 'Gray'
+        else:
+            return 'Beige'  # Light desaturated colors are likely beige/khaki
+    elif h < 30 or h > 330:
+        return 'Red'
+    elif 30 <= h < 90:
+        if s < 0.4 and v > 0.7:
+            return 'Beige'
+        else:
+            return 'Yellow'
+    elif 90 <= h < 150:
+        return 'Green'
+    elif 150 <= h < 210:
+        if s > 0.5:
+            return 'Cyan'
+        else:
+            return 'Gray'  # Desaturated cyan is likely gray
+    elif 210 <= h < 270:
+        return 'Blue'
+    elif 270 <= h < 330:
+        return 'Purple'
+    else:
+        return 'Unknown'
+
 def extract_colors(image_path, num_colors=3):
     # Load the image
     img = Image.open(image_path)
@@ -477,14 +530,19 @@ def extract_colors(image_path, num_colors=3):
     # Sort colors by frequency
     ordered_colors = [center_colors[i] for i in counts.keys()]
 
-    # Convert RGB to Hex
-    hex_colors = [rgb_to_hex(ordered_colors[i]) for i in range(len(ordered_colors))]
+    # Convert RGB to broad color names
+    color_names = [get_broad_color_name(tuple(map(int, color))) for color in ordered_colors]
 
-    # Get color names
-    color_names = [get_color_name(hex_colors[i]) for i in range(len(hex_colors))]
+    # Remove duplicates while preserving order
+    unique_color_names = []
+    for color in color_names:
+        if color not in unique_color_names and color != 'Unknown':
+            unique_color_names.append(color)
 
-    # Return list of tuples (hex_color, color_name)
-    return list(zip(hex_colors, color_names))
+    # Combine 'Dark Green' and 'Green' into just 'Green'
+    unique_color_names = ['Green' if c == 'Dark Green' else c for c in unique_color_names]
+
+    return unique_color_names[:num_colors]  # Return up to num_colors unique colors
 
 
 def rgb_to_hex(color):
