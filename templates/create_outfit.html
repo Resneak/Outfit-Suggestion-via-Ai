@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-container">
+    <div class="title-container">
+        <h1 class="centered-title">Your Custom Outfit</h1>
+    </div>
+    <div class="content-container">
+        <form method="POST" action="{{ url_for('create_outfit') }}" class="outfit-form">
+            {% for category, items in items_by_category.items() %}
+                {% if items %}
+                    <div class="category-section">
+                        <h2>{{ category }}</h2>
+                        <div class="items-container">
+                            {% for item in items %}
+                                <div class="item">
+                                    <label>
+                                        <input type="radio" name="selected_items_{{ category }}" value="{{ item.id }}">
+                                        <img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="Item">
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <button type="submit" class="submit-btn">Create Outfit</button>
+        </form>
+        <div class="navigation-links">
+            <a href="{{ url_for('wardrobe') }}" class="nav-link">Back to Wardrobe</a>
+            <a href="{{ url_for('upload') }}" class="nav-link">Upload Another Item</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .page-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .title-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
+    }
+    .centered-title {
+        width: 100%;
+        max-width: 1200px; /* Or whatever width you'd like */
+        text-align: center;
+    }
+    .content-container {
+        width: 100%;
+    }
+    .outfit-form {
+        width: 100%;
+    }
+    .category-section {
+        margin-bottom: 30px;
+        width: 100%;
+    }
+    .items-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        justify-content: center;
+    }
+    .item {
+        position: relative;
+    }
+    .item img {
+        width: 150px;
+        height: 200px;
+        object-fit: cover;
+        cursor: pointer;
+    }
+    .item input[type="radio"] {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        transform: scale(1.5);
+    }
+    .submit-btn {
+        display: block;
+        margin: 20px auto;
+        padding: 10px 30px;
+        font-size: 18px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+    }
+    .submit-btn:hover {
+        background-color: #218838;
+    }
+    .navigation-links {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 400px;
+        margin: 20px auto 0;
+    }
+    .nav-link {
+        text-decoration: none;
+        color: #007bff;
+        font-size: 16px;
+    }
+    .nav-link:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}

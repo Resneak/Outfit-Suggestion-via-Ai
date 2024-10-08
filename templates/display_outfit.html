@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="content-container">
+    <h1 class="centered-title">Your Custom Outfit</h1>
+    {% for category in CATEGORY_LIST %}
+        {% if selected_items.get(category) %}
+            <div class="category-section">
+                <h2>{{ category }}</h2>
+                <div class="item">
+                    <img src="{{ url_for('static', filename='uploads/' + selected_items[category].image_filename) }}" alt="Item">
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .content-container {
+        padding: 20px;
+        text-align: center; /* Centers the content inside the container */
+    }
+    .centered-title {
+        text-align: center;
+        margin: 0 auto;
+        display: block;
+    }
+    .category-section {
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    .category-section h2 {
+        margin-bottom: 10px;
+    }
+    .item img {
+        width: 200px;
+        height: 300px;
+        object-fit: cover;
+    }
+</style>
+{% endblock %}

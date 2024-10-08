@@ -58,7 +58,12 @@ def top_k_accuracy(inp, targ, k=3):
 
 # Load the trained clothing classification model
 MODEL_PATH = './models/deepfashion_resnet34.pkl'
-learn = load_learner(MODEL_PATH)
+#learn = load_learner(MODEL_PATH)
+
+# for heroku
+learn = load_learner(MODEL_PATH, cpu=True)
+
+
 
 # Get the list of detailed categories from the model's data
 if learn and hasattr(learn.dls, 'vocab'):
@@ -267,6 +272,33 @@ def wardrobe():
         all_colors.update(item.colors.split(','))
     return render_template('wardrobe.html', items=items, all_colors=sorted(all_colors))
 
+@app.route('/create_outfit', methods=['GET', 'POST'])
+def create_outfit():
+    if request.method == 'POST':
+        selected_item_ids = []
+        for category in CATEGORY_LIST:
+            item_id = request.form.get('selected_items_' + category)
+            if item_id:
+                selected_item_ids.append(int(item_id))
+        if selected_item_ids:
+            selected_items = ClothingItem.query.filter(ClothingItem.id.in_(selected_item_ids)).all()
+        else:
+            selected_items = []
+        # Organize the selected items by category
+        selected_items_by_category = {category: None for category in CATEGORY_LIST}
+        for item in selected_items:
+            selected_items_by_category[item.category] = item
+        return render_template('display_outfit.html', selected_items=selected_items_by_category, CATEGORY_LIST=CATEGORY_LIST)
+    else:
+        # GET request, display the selection form
+        items = ClothingItem.query.all()
+        categories = CATEGORY_LIST
+        items_by_category = {category: [] for category in categories}
+        for item in items:
+            items_by_category[item.category].append(item)
+        return render_template('create_outfit.html', items_by_category=items_by_category)
+
+
 @app.route('/suggestions', methods=['GET'])
 def suggestions():
     # Get selected categories from the query parameters
@@ -469,34 +501,32 @@ def get_broad_color_name(rgb_color):
     # Convert hue to degrees
     h *= 360
     
-    # Adjust thresholds for better detection of light, desaturated colors
-    if s < 0.2:  # Increased threshold for low saturation
+    # Adjust thresholds for better detection of purple and other colors
+    if s < 0.15:  # Very low saturation colors
         if v > 0.9:
             return 'White'
         elif v < 0.2:
             return 'Black'
-        elif 0.2 <= v < 0.6:
+        else:
             return 'Gray'
-        else:
-            return 'Beige'  # Light desaturated colors are likely beige/khaki
-    elif h < 30 or h > 330:
+    elif v < 0.2:
+        return 'Black'
+    elif h < 10 or h > 350:
         return 'Red'
-    elif 30 <= h < 90:
-        if s < 0.4 and v > 0.7:
-            return 'Beige'
-        else:
-            return 'Yellow'
-    elif 90 <= h < 150:
+    elif 10 <= h < 45:
+        return 'Orange'
+    elif 45 <= h < 70:
+        return 'Yellow'
+    elif 70 <= h < 165:
         return 'Green'
-    elif 150 <= h < 210:
-        if s > 0.5:
-            return 'Cyan'
-        else:
-            return 'Gray'  # Desaturated cyan is likely gray
-    elif 210 <= h < 270:
+    elif 165 <= h < 190:
+        return 'Cyan'
+    elif 190 <= h < 270:  # Narrowed blue range
         return 'Blue'
-    elif 270 <= h < 330:
+    elif 270 <= h < 330:  # Expanded purple range
         return 'Purple'
+    elif 330 <= h < 350:
+        return 'Pink'
     else:
         return 'Unknown'
 
@@ -517,7 +547,7 @@ def extract_colors(image_path, num_colors=3):
     
     # Check if there are enough pixels left after background removal
     if len(pixels) == 0:
-        return [("#FFFFFF", "White")]
+        return ['White']
 
     # Use KMeans to cluster pixels
     kmeans = KMeans(n_clusters=num_colors)
@@ -539,9 +569,6 @@ def extract_colors(image_path, num_colors=3):
         if color not in unique_color_names and color != 'Unknown':
             unique_color_names.append(color)
 
-    # Combine 'Dark Green' and 'Green' into just 'Green'
-    unique_color_names = ['Green' if c == 'Dark Green' else c for c in unique_color_names]
-
     return unique_color_names[:num_colors]  # Return up to num_colors unique colors
 
 
@@ -553,4 +580,8 @@ def rgb_to_hex(color):
     )
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    #app.run(debug=True)
+
+    #for heroku
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

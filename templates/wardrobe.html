@@ -16,6 +16,11 @@
         </div>
     </div>
 
+    <div class="create-outfit-container">
+        <a href="{{ url_for('create_outfit') }}" class="create-outfit-btn">Create Outfit Manually</a>
+    </div>
+    
+
     {% set categories = ['Top', 'Bottom', 'Outerwear', 'Footwear', 'Accessory', 'Dress'] %}
     {% for category in categories %}
         <div class="category-section">
@@ -200,6 +205,23 @@
     .color-btn[style*="background-color: White"] {
         color: black;
         text-shadow: none;
+    }
+    .create-outfit-container {
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .create-outfit-btn {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+    }
+
+    .create-outfit-btn:hover {
+        background-color: #0056b3;
     }
 </style>
 {% endblock %}
