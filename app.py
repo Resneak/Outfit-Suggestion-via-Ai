@@ -71,8 +71,32 @@ if learn and hasattr(learn.dls, 'vocab'):
 else:
     DETAILED_CATEGORIES = []  # Fallback if model loading fails
 
-# Load U-2-Net model for background removal
-U2NET_PATH = 'u2net.pth'  # Ensure the u2net.pth file is in the same directory
+# FOR PC
+#U2NET_PATH = 'u2net.pth'  # Ensure the u2net.pth file is in the same directory
+
+# FOR HEROKU
+U2NET_PATH = 'u2net.pth'
+
+# Define your S3 file URL (replace <bucket-name>, <region>, and other parts as needed)
+S3_URL = "https://my-u2net-model-bucket.s3.us-east-2.amazonaws.com/u2net.pth"
+
+# Check if the U2NET_PATH exists locally; if not, download it from S3
+if not os.path.exists(U2NET_PATH):
+    print(f"Downloading U2NET model from {S3_URL}...")
+    response = requests.get(S3_URL)
+    with open(U2NET_PATH, 'wb') as f:
+        f.write(response.content)
+    print("Download complete!")
+
+
+
+
+
+
+
+
+
+
 u2net = U2NET(3, 1)
 u2net.load_state_dict(torch.load(U2NET_PATH, map_location=torch.device('cpu')))
 u2net.eval()  # Set model to evaluation mode
