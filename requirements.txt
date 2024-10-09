@@ -3,7 +3,7 @@ fastai==2.7.17
 Flask==3.0.3
 flask_sqlalchemy==3.1.1
 matplotlib==3.9.2
-numpy==1.26.4  # Ensure you have a working version
+numpy==1.26.4
 opencv_python_headless==4.7.0.72
 pandas==2.2.3
 Pillow==10.4.0
@@ -13,5 +13,3 @@ torch==2.4.1
 torchvision==0.16.2
 torchaudio==2.4.1
 --extra-index-url https://download.pytorch.org/whl/cpu
-torchvision==0.19.1+cu118
-webcolors==1.11.1
