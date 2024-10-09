@@ -58,10 +58,10 @@ def top_k_accuracy(inp, targ, k=3):
 
 # Load the trained clothing classification model
 MODEL_PATH = './models/deepfashion_resnet34.pkl'
-#learn = load_learner(MODEL_PATH)
+learn = load_learner(MODEL_PATH)
 
 # for heroku
-learn = load_learner(MODEL_PATH, cpu=True)
+#learn = load_learner(MODEL_PATH, cpu=True)
 
 
 
@@ -580,8 +580,8 @@ def rgb_to_hex(color):
     )
 
 if __name__ == '__main__':
-    #app.run(debug=True)
+    app.run(debug=True)
 
     #for heroku
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    #port = int(os.environ.get('PORT', 5000))
+    #app.run(host='0.0.0.0', port=port)
