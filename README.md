@@ -69,12 +69,6 @@ This project is an AI-powered web application that suggests outfits based on a u
     http://127.0.0.1:5000/
     ```
 
-### Deployment on AWS Elastic Beanstalk
-
-1. Set up AWS Elastic Beanstalk.
-2. Ensure your `application.py` file is named correctly for deployment (e.g., `application.py` for AWS EB).
-3. Package the application as a zip file including `application.py`, `u2net.pth`, and all required files.
-4. Deploy the zip file via the Elastic Beanstalk console.
 
 ### Usage
 
