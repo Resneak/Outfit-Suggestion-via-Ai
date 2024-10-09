@@ -1,105 +1,94 @@
-AI-Powered Outfit Recommendation Web Application
-This project is an AI-powered outfit recommendation web application that provides suggestions based on your wardrobe, weather conditions, and outfit types. It uses machine learning models to recognize clothing from images and assist users in curating outfits for different occasions.
 
-Live Application
-You can view the live version of the app at: http://3.87.59.31:5000/
+# AI-Powered Outfit Suggestion Web Application
 
-Features
-Image Upload and Processing: Users can upload images of clothing items, and the application removes the background and analyzes the clothing.
-Clothing Classification: Uses a ResNet34 model to classify clothing into detailed categories such as tops, bottoms, outerwear, footwear, and accessories.
-Outfit Recommendation: Provides personalized outfit suggestions by matching items from different categories, factoring in color harmony.
-Color Detection: Uses KMeans clustering to extract the primary colors from each clothing item and categorizes the colors.
-Weather-Based Recommendations: Fetches current weather data using the OpenWeather API and suggests appropriate outfits.
-Wardrobe Management: Allows users to store, categorize, and filter clothing items in their wardrobe.
-Tech Stack
-Backend: Flask (Python)
-Frontend: HTML, CSS, Jinja2 (for templating)
-Database: SQLite (for storing clothing items)
-Machine Learning: FastAI, PyTorch, ResNet34
-Background Removal: U²-Net (for removing the background from clothing images)
-Deployment: AWS Elastic Beanstalk
-Weather Data: OpenWeather API
-Installation
-Prerequisites
-Python 3.9 or higher
-Flask
-SQLite (for local database)
-Clone the Repository
-bash
-Copy code
-git clone https://github.com/yourusername/ai-powered-outfit-recommendation.git
-cd ai-powered-outfit-recommendation
-Install Dependencies
-Create a virtual environment and install the dependencies from the requirements.txt file.
+This project is an AI-powered web application that suggests outfits based on a user's wardrobe, weather conditions, and outfit preferences. The application uses deep learning models for clothing classification and background removal, and it is deployed on AWS Elastic Beanstalk.
 
-bash
-Copy code
-python3 -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-pip install -r requirements.txt
-Set Up Environment Variables
-You need to set up your environment variables to include your OpenWeather API key.
+## Features
 
-bash
-Copy code
-export OPENWEATHER_API_KEY=your_api_key
-Alternatively, you can create a .env file and add your API key like this:
+- Upload images of your clothes and categorize them (Top, Bottom, Outerwear, etc.).
+- Automatically remove backgrounds from clothing images.
+- Predict the clothing category (Top, Bottom, Outerwear, etc.) using a deep learning model.
+- Create outfits by selecting clothes from your virtual wardrobe.
+- Get outfit suggestions based on weather data (integrated with OpenWeather API).
+- Store your wardrobe in a SQLite database.
+  
+## Technologies Used
 
-bash
-Copy code
-OPENWEATHER_API_KEY=your_api_key
-Run the Application
-Once everything is set up, run the application locally:
+- **Flask**: For building the web application.
+- **FastAI**: For clothing classification using a ResNet34 model.
+- **U²-Net**: For background removal.
+- **SQLite**: For storing the uploaded wardrobe items.
+- **OpenWeather API**: For fetching weather data.
+- **AWS Elastic Beanstalk**: For hosting the application.
 
-bash
-Copy code
-flask run
-The application will be available at http://127.0.0.1:5000/.
+## Setup Instructions
 
-Deployment
-This project is deployed on AWS Elastic Beanstalk. To deploy, follow the standard Elastic Beanstalk deployment process:
+### Prerequisites
 
-Zip your project files, including application.py, requirements.txt, and Procfile.
-Create and configure an Elastic Beanstalk environment.
-Upload your zip file to Elastic Beanstalk.
-The app should be live on your provided domain.
-Project Structure
-php
-Copy code
-.
-├── instance/
-├── model_training/
-├── models/
-├── static/
-│   └── uploads/              # Image upload folder
-├── templates/
-│   └── index.html            # Main HTML page for the web app
-├── application.py            # Main Flask application
-├── u2net.pth                 # Pretrained U²-Net model for background removal
-├── u2net.py                  # U²-Net architecture script
-├── requirements.txt          # Python dependencies
-└── README.md                 # Project README file
-Model
-U²-Net
-U²-Net is used for background removal from uploaded images. The pre-trained model (u2net.pth) is loaded and run on the server to process images.
+1. Install [Python 3.10+](https://www.python.org/downloads/).
+2. Install [pip](https://pip.pypa.io/en/stable/installation/).
+3. Set up an account with [OpenWeather API](https://openweathermap.org/api) and obtain an API key.
 
-ResNet34
-A FastAI-trained ResNet34 model is used to classify clothing items into categories (e.g., tops, bottoms, outerwear).
+### Installation
 
-API Integration
-OpenWeather API: Used to fetch weather data based on user input (latitude and longitude) to recommend weather-appropriate outfits.
-Future Enhancements
-User Authentication: Add the ability for users to create accounts and manage personalized wardrobes.
-Seasonal Recommendations: Enhance recommendations based on seasonal trends and preferences.
-Mobile Version: Optimize the app for mobile devices.
-Integration with Online Shopping: Add the ability to suggest where users can purchase similar items based on their wardrobe.
-Contributing
-Contributions are welcome! If you'd like to improve this project or add new features, feel free to open a pull request or raise an issue.
+1. Clone the repository:
 
-Fork the project
-Create your feature branch (git checkout -b feature/your-feature-name)
-Commit your changes (git commit -m 'Add some feature')
-Push to the branch (git push origin feature/your-feature-name)
-Open a pull request
-License
-This project is licensed under the MIT License - see the LICENSE file for details.
+    ```bash
+    git clone https://github.com/yourusername/ai-outfit.git
+    ```
+
+2. Change directory to the project folder:
+
+    ```bash
+    cd ai-outfit
+    ```
+
+3. Install the required dependencies:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. Set up environment variables for the OpenWeather API:
+
+    ```bash
+    export OPENWEATHER_API_KEY=your_api_key
+    ```
+
+### Running the Application
+
+1. Run the Flask development server:
+
+    ```bash
+    python application.py
+    ```
+
+2. Access the application at:
+
+    ```
+    http://127.0.0.1:5000/
+    ```
+
+### Deployment on AWS Elastic Beanstalk
+
+1. Set up AWS Elastic Beanstalk.
+2. Ensure your `application.py` file is named correctly for deployment (e.g., `application.py` for AWS EB).
+3. Package the application as a zip file including `application.py`, `u2net.pth`, and all required files.
+4. Deploy the zip file via the Elastic Beanstalk console.
+
+### Usage
+
+- Navigate to the upload page to add images of clothing items.
+- Use the outfit creation tool to mix and match items from your wardrobe.
+- Check the weather-based outfit suggestions for daily use.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [FastAI](https://www.fast.ai/) for the deep learning models.
+- [U²-Net](https://github.com/xuebinqin/U-2-Net) for background removal.
+- [OpenWeather API](https://openweathermap.org/) for weather data.
+
