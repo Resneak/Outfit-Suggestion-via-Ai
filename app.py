@@ -26,20 +26,18 @@ import torch.nn as nn
 from torchvision import transforms
 from PIL import Image
 
-from u2net import U2NET  # Assuming the u2net.py file is in the same directory
+from u2net import U2NET 
 import torchvision.transforms as transforms
 
 
 app = Flask(__name__)
 
-# Configure upload folder
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Configure the SQLite database
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Silence the deprecation warning
-db = SQLAlchemy(app)  # Initialize the database
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  
+db = SQLAlchemy(app)  
 
 # Ensure the upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -49,14 +47,13 @@ OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY')
 if not OPENWEATHER_API_KEY:
     raise RuntimeError("OpenWeather API key not found. Please set the OPENWEATHER_API_KEY environment variable.")
 
-# Define the top_k_accuracy function to resolve the error
+
 def top_k_accuracy(inp, targ, k=3):
     "Computes the Top-k accuracy for classification"
     inp = inp.topk(k=k, dim=-1)[1]
     targ = targ.unsqueeze(dim=-1)
     return (inp == targ).any(dim=-1).float().mean()
 
-# Load the trained clothing classification model
 MODEL_PATH = './models/deepfashion_resnet34.pkl'
 learn = load_learner(MODEL_PATH)
 
@@ -72,7 +69,6 @@ else:
     DETAILED_CATEGORIES = []  # Fallback if model loading fails
 
 # FOR PC
-#U2NET_PATH = 'u2net.pth'  # Ensure the u2net.pth file is in the same directory
 
 # FOR HEROKU
 U2NET_PATH = 'u2net.pth'
