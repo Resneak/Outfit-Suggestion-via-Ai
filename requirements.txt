@@ -3,10 +3,8 @@ Flask==3.0.3
 flask_sqlalchemy==3.1.1
 numpy==1.26.4
 opencv_python_headless==4.7.0.72
-pandas==2.2.3
 Pillow==10.4.0
 Requests==2.32.3
-scikit_learn==1.5.2  # Optional, keep if clustering is required
 torch==2.1.2
 torchvision==0.16.2
 torchaudio==2.1.2
